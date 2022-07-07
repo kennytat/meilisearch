@@ -1,4 +1,5 @@
 use actix_web::{web, HttpRequest, HttpResponse};
+use meilisearch_lib::tasks::error::TaskError;
 use meilisearch_lib::tasks::task::{TaskContent, TaskEvent, TaskId};
 use meilisearch_lib::tasks::TaskFilter;
 use meilisearch_lib::MeiliSearch;
@@ -169,7 +170,7 @@ async fn get_tasks(
 
 async fn get_task(
     meilisearch: GuardedData<ActionPolicy<{ actions::TASKS_GET }>, MeiliSearch>,
-    task_id: web::Path<TaskId>,
+    task_id: web::Path<String>,
     req: HttpRequest,
     analytics: web::Data<dyn Analytics>,
 ) -> Result<HttpResponse, ResponseError> {
@@ -190,10 +191,11 @@ async fn get_task(
         Some(filters)
     };
 
-    let task: TaskView = meilisearch
-        .get_task(task_id.into_inner(), filters)
-        .await?
-        .into();
+    let id = task_id
+        .parse::<TaskId>()
+        .map_err(|_| TaskError::OutOfBounds)?;
+
+    let task: TaskView = meilisearch.get_task(id.into_inner(), filters).await?.into();
 
     Ok(HttpResponse::Ok().json(task))
 }
